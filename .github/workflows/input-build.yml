@@ -1,0 +1,77 @@
+name: On-demand BKB firmware
+on:
+  workflow_dispatch:
+    inputs:
+      keyboard:
+        description: Keyboard
+        required: true
+        default: 'skeletyl'
+        type: choice
+        options:
+        - charybdis/3x5
+        - charybdis/3x6
+        - charybdis/4x6
+        - scylla
+        - skeletyl
+        - tbk
+      controller:
+        description: Controller
+        required: true
+        default: 'v1/elitec'
+        type: choice
+        options:
+        - blackpill
+        - v1/elitec
+        - v2/elitec
+      keymap:
+        description: Keymap
+        required: true
+        default: 'default'
+        type: choice
+        options:
+        - default
+        - via
+        - vial
+
+jobs:
+  build:
+    name: Build ${{ github.event.inputs.keyboard }}/${{ github.event.inputs.controller }}
+    runs-on: ubuntu-latest
+    container: qmkfm/base_container
+
+    steps:
+    - name: Checkout Bastardkb branch
+      if: ${{ (github.event.inputs.keymap != 'vial') }}
+      uses: actions/checkout@v3
+      with:
+        repository: Bastardkb/bastardkb-qmk
+        ref: bkb-master
+        submodules: recursive
+
+    - name: Checkout VIAL branch
+      if: ${{ (github.event.inputs.keymap == 'vial') }}
+      uses: actions/checkout@v3
+      with:
+        repository: Bastardkb/bastardkb-qmk
+        ref: bkb-vial
+        submodules: recursive
+
+    - name: Build firmware
+      id: build
+      run: |
+        set -x
+        qmk compile -kb bastardkb/${{ github.event.inputs.keyboard }}/${{ github.event.inputs.controller }} -km ${{ github.event.inputs.keymap }}
+        TARGET=$(printf "${{ github.event.inputs.keyboard }}/${{ github.event.inputs.controller }}" | sed 's#/#_#g')_${{ github.event.inputs.keymap }}
+        echo "::set-output name=artifact-name::${TARGET}"
+
+    - name: Archive firmware
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ steps.build.outputs.artifact-name }}
+        retention-days: 30
+        path: |
+          *.hex
+          *.bin
+          *.uf2
+      continue-on-error: true
+

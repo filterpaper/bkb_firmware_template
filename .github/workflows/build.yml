@@ -1,0 +1,41 @@
+name: Build userspace BKB firmware
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    name: Build firmware
+    runs-on: ubuntu-latest
+    container: qmkfm/base_container
+    strategy:
+      fail-fast: false
+      matrix:
+        keyboard:
+        - username.json
+
+    steps:
+    - name: Checkout Bastardkb QMK
+      uses: actions/checkout@v3
+      with:
+        repository: Bastardkb/bastardkb-qmk
+        ref: bkb-master
+        submodules: recursive
+
+    - name: Checkout user config
+      uses: actions/checkout@v3
+      with:
+        path: users/${{ github.actor }}
+
+    - name: Build ${{ matrix.keyboard }} firmware
+      working-directory: users/${{ github.actor }}
+      run: qmk compile -j 10 ${{ matrix.keyboard }} || true
+
+    - name: Archive ${{ matrix.keyboard }} firmware
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ matrix.keyboard }}
+        path: |
+          *.hex
+          *.bin
+          *.uf2
+      continue-on-error: true
+
